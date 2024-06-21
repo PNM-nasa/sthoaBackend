@@ -1,0 +1,6 @@
+setup (bao gồm như file dùng để set up - cài đặt một số phần mềm )
+- appdev-setup : là các ứng dụng cho việc lập trình đã cài đặt 
+
+- app_dont_setup: là các file setup nhưng chưa được cài đặt ( file setup cũ hoặc phiên bản quá mới, hết thời gian free :)) )
+
+- orther-setup : là các file setup chưa được phân loại 
