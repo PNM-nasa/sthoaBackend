@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -8,7 +9,7 @@ import (
 	"strconv"
 )
 
-func getFileDrive(id int, idFileDrive string) []byte {
+func getFileDrive(id int, idFileDrive string) ([]byte, error) {
 	log.Println("func : getFileDrive()")
 	downloadURL := "https://drive.google.com/uc?export=download&id=" + idFileDrive
 	filePath := "lessons/" + strconv.Itoa(id)
@@ -16,7 +17,7 @@ func getFileDrive(id int, idFileDrive string) []byte {
 	// have file
 	if err == nil {
 		log.Println("info : The file id already exists, no recording is performed. Use another function to correct data if corrupted")
-		return data
+		return data, nil
 	}
 
 	file, err := os.Create(filePath)
@@ -30,7 +31,11 @@ func getFileDrive(id int, idFileDrive string) []byte {
 		log.Println("Error downloading file:", err)
 		panic(err)
 	}
+
 	defer response.Body.Close()
+	if response.Status != "200" {
+		return []byte{}, errors.New("file drive not found")
+	}
 
 	sizeFile, err := io.Copy(file, response.Body)
 	if err != nil {
@@ -44,5 +49,5 @@ func getFileDrive(id int, idFileDrive string) []byte {
 		panic(err)
 	}
 
-	return data
+	return data, nil
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/joho/godotenv"
 
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -91,12 +92,16 @@ type Restaurant struct {
 // run `go run .`
 func main() {
 
-	checkenv()
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("warn : Error loading .env file, don't care in render")
+	}
+
 	checkKeyEnv([]string{"MONGODB_URI"})
 
 	// fmt.Println(string(getFileDrive(0, "1wU5nCulZZfmN133siIBSKJZ1cU8SFw8F")))
-
 	MONGODB_URI := os.Getenv("MONGODB_URI")
+	ADMIN_KEY := os.Getenv("ADMIN_KEY")
 
 	// Use the SetServerAPIOptions() method to set the version of the Stable API on the client
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
@@ -174,16 +179,35 @@ func main() {
 				return c.SendString("error: not found pdf file with id: " + strconv.Itoa(id))
 			}
 			log.Println(lesson.DriveID)
-			return c.Send(getFileDrive(id, lesson.DriveID))
+			data, err := getFileDrive(id, lesson.DriveID)
+			if err != nil {
+				panic(err)
+			}
+			return c.Send(data)
 		}).
 		Route("/:name/:driveid").
 		Post(func(c fiber.Ctx) error {
+			key := c.Query("admin-key", "0")
+			if key != ADMIN_KEY {
+				return c.SendString("error key")
+			}
 			idfile, err := strconv.Atoi(c.Params("id"))
 			if err != nil {
 				return c.SendString("error: id must is number")
 			}
 			namefile := c.Params("name")
 			driveID := c.Params("driveid")
+			data, err := getFileDrive(idfile, driveID)
+
+			if err != nil {
+				return c.SendString(`error : id file drive `)
+			}
+
+			if false {
+				log.Fatalf(string(data))
+				return nil
+			}
+
 			lesson := Lesson{LessonID: int64(idfile), Name: namefile, DriveID: driveID}
 			lesioncoll.InsertOne(
 				context.TODO(),
@@ -191,6 +215,5 @@ func main() {
 			)
 			return nil
 		})
-
 	log.Fatal(app.Listen(":3000"))
 }
