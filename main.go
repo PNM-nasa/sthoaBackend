@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 
 	"log"
 
@@ -89,30 +90,49 @@ type Restaurant struct {
 	Grades       []interface{} `bson:"grades,omitempty"`
 }
 
+type Question struct {
+	LessonID int64
+	Form     string
+	Content  string
+	Options  []string
+	Answer   string
+}
+
+type FormQuestion struct {
+	truefalse string
+	chossOne  string
+}
+
 // run `go run .`
 func main() {
+
+	// reset "lessons" forder
+	os.RemoveAll("lessons")
+	os.Mkdir("lesson", 0755)
+
+	formQuestion := &FormQuestion{
+		truefalse: "truefalse",
+		chossOne:  "chossOne",
+	}
 
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("warn : Error loading .env file, don't care in render")
 	}
-
 	checkKeyEnv([]string{"MONGODB_URI"})
 
-	// fmt.Println(string(getFileDrive(0, "1wU5nCulZZfmN133siIBSKJZ1cU8SFw8F")))
 	MONGODB_URI := os.Getenv("MONGODB_URI")
 	ADMIN_KEY := os.Getenv("ADMIN_KEY")
 
 	// Use the SetServerAPIOptions() method to set the version of the Stable API on the client
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(MONGODB_URI).SetServerAPIOptions(serverAPI)
-	// Create a new client and connect to the server
+
 	client, err := mongo.Connect(context.TODO(), opts)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-
 		if err = client.Disconnect(context.TODO()); err != nil {
 			panic(err)
 		}
@@ -140,26 +160,29 @@ func main() {
 	fmt.Println(djson["year"])
 
 	lesioncoll := client.Database("core_dp").Collection("lessons")
+	questionColl := client.Database("core_dp").Collection("questions")
 	// lesioncoll.Indexes().CreateOne(
 	// 	context.TODO(),
 
 	// )
 	//bufffile, err := os.ReadFile("sample-pdf-file.pdf")
-	lesson := Lesson{LessonID: 20, Name: "lesson 2", DriveID: "1wU5nCulZZfmN133siIBSKJZ1cU8SFw8F"}
-	// lesioncoll.InsertOne(
-	// 	context.TODO(),
-	// 	bson.D{{"key", lesson.Name}},
-	// )
+	// lesson := Lesson{LessonID: 20, Name: "lesson 2", DriveID: "1wU5nCulZZfmN133siIBSKJZ1cU8SFw8F"}
 
-	b, err := lesioncoll.InsertOne(context.TODO(), lesson)
-	if err != nil {
-		panic(err)
+	// b, err := lesioncoll.InsertOne(context.TODO(), lesson)
+	// if err != nil {
+	// 	panic(err)
 
-	}
-	print(b)
+	// }
+	// print(b)
 
 	// newRestaurant := Restaurant{Name: "8282", Cuisine: "Korean"}
 	// lesioncoll.InsertOne(context.TODO(), newRestaurant)
+	print("formQuestion.chossOne : ", formQuestion.chossOne)
+	question := Question{LessonID: 0, Form: formQuestion.chossOne, Content: "quesion 1 ", Options: []string{"sf", "sfd", "dfd", "dfd"}, Answer: "0"}
+	questionColl.InsertOne(
+		context.TODO(),
+		question,
+	)
 
 	app := fiber.New()
 
@@ -215,5 +238,61 @@ func main() {
 			)
 			return nil
 		})
+	appv1.Route("question/:lessonid/:amount").Get(func(c fiber.Ctx) error {
+		lessonID, err := strconv.Atoi(c.Params("lessonid"))
+		if err != nil {
+			return c.SendString("error: id must is number")
+		}
+		amount, err := strconv.Atoi(c.Params("amount"))
+		if err != nil {
+			return c.SendString("error: amount must is number")
+		}
+
+		cursor, err := questionColl.Find(
+			context.TODO(),
+			bson.D{
+				{"lessonid", lessonID},
+			},
+		)
+		if err != nil {
+			panic(err)
+		}
+		var questions []Question
+		// cursor.Decode(&questions)
+		for cursor.Next(context.TODO()) {
+			//Create a value into which the single document can be decoded
+			var elem Question
+			err := cursor.Decode(&elem)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			questions = append(questions, question)
+
+		}
+
+		var output []Question
+		for index, item := range questions {
+			if amount <= 0 {
+				break
+			}
+
+			if float64(amount)/float64(len(questions)-index) >= rand.Float64() {
+
+				output = append(output, item)
+				amount--
+				fmt.Println(strconv.Itoa(index))
+			}
+
+		}
+		// outputjson, err := json.Marshal(output)
+		outputjson, err := json.MarshalIndent(output, "", "	")
+		if err != nil {
+			panic(err)
+		}
+
+		return c.Send(outputjson)
+	})
+	// appv1.Route("question/:id")
 	log.Fatal(app.Listen(":3000"))
 }
