@@ -268,7 +268,7 @@ func main() {
 			}
 
 			questions = append(questions, question)
-
+			print(questions)
 		}
 
 		var output []Question
