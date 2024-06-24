@@ -110,10 +110,10 @@ func main() {
 	os.RemoveAll("lessons")
 	os.Mkdir("lesson", 0755)
 
-	formQuestion := &FormQuestion{
-		truefalse: "truefalse",
-		chossOne:  "chossOne",
-	}
+	// formQuestion := &FormQuestion{
+	// 	truefalse: "truefalse",
+	// 	chossOne:  "chossOne",
+	// }
 
 	err := godotenv.Load()
 	if err != nil {
@@ -177,12 +177,12 @@ func main() {
 
 	// newRestaurant := Restaurant{Name: "8282", Cuisine: "Korean"}
 	// lesioncoll.InsertOne(context.TODO(), newRestaurant)
-	print("formQuestion.chossOne : ", formQuestion.chossOne)
-	question := Question{LessonID: 0, Form: formQuestion.chossOne, Content: "quesion 1 ", Options: []string{"sf", "sfd", "dfd", "dfd"}, Answer: "0"}
-	questionColl.InsertOne(
-		context.TODO(),
-		question,
-	)
+	// print("formQuestion.chossOne : ", formQuestion.chossOne)
+	// question := Question{LessonID: 0, Form: formQuestion.chossOne, Content: "quesion 1 ", Options: []string{"sf", "sfd", "dfd", "dfd"}, Answer: "0"}
+	// questionColl.InsertOne(
+	// 	context.TODO(),
+	// 	question,
+	// )
 
 	app := fiber.New()
 
@@ -267,8 +267,9 @@ func main() {
 				log.Fatal(err)
 			}
 
-			questions = append(questions, question)
-			print(questions)
+			questions = append(questions, elem)
+			p, _ := json.MarshalIndent(questions, "", "	")
+			print(string(p))
 		}
 
 		var output []Question
