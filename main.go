@@ -168,7 +168,12 @@ func main() {
 	// )
 
 	app := fiber.New()
-	app.Use(cors.New())
+	app.Use(cors.New(cors.Config{
+		AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
+		AllowOrigins:     "http://localhost:5000",
+		AllowCredentials: true,
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	}))
 
 	appv1 := app.Route("/v1")
 
@@ -222,6 +227,9 @@ func main() {
 			)
 			return nil
 		})
+	appv1.Route("question").Get(func(c fiber.Ctx) error {
+		return c.SendStatus(200)
+	})
 	appv1.Route("question/:lessonid/:amount").Get(func(c fiber.Ctx) error {
 		lessonID, err := strconv.Atoi(c.Params("lessonid"))
 		if err != nil {
@@ -301,33 +309,35 @@ func main() {
 				{"email", usergg.Email},
 			},
 		)
-		print("cnt", cnt)
 
 		if cnt == 0 {
-			// not found user, create a user
 			print("create user")
-			user.photoUrl = usergg.Picture
-			user.name = usergg.Email
-			user.lever = 0
-			user.email = usergg.Email
-			user.token = "23478"
-
+			user.PhotoUrl = usergg.Picture
+			user.Name = usergg.Email
+			user.Lever = 0
+			user.Email = usergg.Email
+			user.Token = "23478"
+			userColl.InsertOne(
+				context.TODO(),
+				user,
+			)
 		} else {
-			// get user login in database
+			print("loading data user")
 			err = userColl.FindOne(
 				context.TODO(),
 				bson.D{
 					{"email", usergg.Email},
 				},
 			).Decode(&user)
+
 		}
 
 		data := map[string]string{
-			"photoUrl": user.photoUrl,
-			"name":     user.name,
-			"lever":    strconv.Itoa(user.lever),
-			"email":    user.email,
-			"token":    user.token,
+			"photoUrl": user.PhotoUrl,
+			"name":     user.Name,
+			"lever":    strconv.Itoa(user.Lever),
+			"email":    user.Email,
+			"token":    user.Token,
 		}
 		jsonString, _ := json.Marshal(data)
 		c.SendString(string(jsonString))
