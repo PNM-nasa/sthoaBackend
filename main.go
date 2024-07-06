@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"net/http"
 
 	"log"
 
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/joho/godotenv"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -137,30 +140,10 @@ func main() {
 			panic(err)
 		}
 	}()
-	coll := client.Database("sample_mflix").Collection("movies")
-	title := "Back to the Future"
-	var result bson.M
-	err = coll.FindOne(context.TODO(), bson.D{{Key: "title", Value: title}}).
-		Decode(&result)
-	if err == mongo.ErrNoDocuments {
-		fmt.Printf("No document was found with the title %s\n", title)
-		return
-	}
-	if err != nil {
-		panic(err)
-	}
-	df, err := json.MarshalIndent(result, "", "	")
-	var djson map[string]interface{}
-	json.Unmarshal(df, &djson)
-	if err != nil {
-		panic(err)
-	}
-	//fmt.Printf("%s\n", df)
-	fmt.Println("Pinged your deployment. You successfully connected to MongoDB!")
-	fmt.Println(djson["year"])
 
 	lesioncoll := client.Database("core_dp").Collection("lessons")
 	questionColl := client.Database("core_dp").Collection("questions")
+	userColl := client.Database("core_dp").Collection("user")
 	// lesioncoll.Indexes().CreateOne(
 	// 	context.TODO(),
 
@@ -185,6 +168,7 @@ func main() {
 	// )
 
 	app := fiber.New()
+	app.Use(cors.New())
 
 	appv1 := app.Route("/v1")
 
@@ -294,6 +278,61 @@ func main() {
 
 		return c.Send(outputjson)
 	})
+	appv1.Route("user").Get(func(c fiber.Ctx) error {
+		accessToken := c.Query("access_token")
+		var user User
+		log.Println(accessToken)
+
+		response, errhttp := http.Get("https://www.googleapis.com/oauth2/v3/userinfo?access_token=" + accessToken)
+		if errhttp != nil {
+			panic(errhttp)
+		}
+		body, _ := ioutil.ReadAll(response.Body)
+		print(string(body))
+		var usergg Usergg
+		err = json.Unmarshal(body, &usergg)
+		if err != nil {
+			panic(err)
+		}
+
+		cnt, _ := userColl.CountDocuments(
+			context.TODO(),
+			bson.D{
+				{"email", usergg.Email},
+			},
+		)
+		print("cnt", cnt)
+
+		if cnt == 0 {
+			// not found user, create a user
+			print("create user")
+			user.photoUrl = usergg.Picture
+			user.name = usergg.Email
+			user.lever = 0
+			user.email = usergg.Email
+			user.token = "23478"
+
+		} else {
+			// get user login in database
+			err = userColl.FindOne(
+				context.TODO(),
+				bson.D{
+					{"email", usergg.Email},
+				},
+			).Decode(&user)
+		}
+
+		data := map[string]string{
+			"photoUrl": user.photoUrl,
+			"name":     user.name,
+			"lever":    strconv.Itoa(user.lever),
+			"email":    user.email,
+			"token":    user.token,
+		}
+		jsonString, _ := json.Marshal(data)
+		c.SendString(string(jsonString))
+		return nil
+	})
 	// appv1.Route("question/:id")
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(":4000"))
 }
