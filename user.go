@@ -1,13 +1,13 @@
 package main
 
 type User struct {
-	signInType  string
-	token       string
-	photoUrl    string
-	name        string
-	email       string
-	lever       int
-	accessToken string
+	SignInType  string
+	Token       string
+	PhotoUrl    string
+	Name        string
+	Email       string
+	Lever       int
+	AccessToken string
 }
 
 type Usergg struct {
@@ -17,6 +17,6 @@ type Usergg struct {
 	FamilyName    string `json:"family_name"`
 	Picture       string `json:"picture"`
 	Email         string `json:"email"`
-	EmailVerified bool   `json:email_verified"`
-	Locale        string `json:locale`
+	EmailVerified bool   `json:"email_verified"`
+	Locale        string `json:"locale"`
 }
