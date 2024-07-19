@@ -25,15 +25,15 @@ func getFileDrive(id int, idFileDrive string) ([]byte, error) {
 		log.Println("Error creating file:", err)
 		panic(err)
 	}
-	println(downloadURL)
+
 	response, err := http.Get(downloadURL)
 	if err != nil {
 		log.Println("Error downloading file:", err)
 		panic(err)
 	}
-	println(response.Status)
+
 	defer response.Body.Close()
-	if response.Status != "200 OK" {
+	if response.Status != "200" {
 		return []byte{}, errors.New("file drive not found")
 	}
 

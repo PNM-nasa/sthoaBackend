@@ -17,10 +17,6 @@ import (
 	"os"
 	"time"
 
-	apiquestion "github.com/PNM-nasa/sthoabackend/api_question"
-	"github.com/PNM-nasa/sthoabackend/forum"
-	"github.com/PNM-nasa/sthoabackend/random"
-	vars "github.com/PNM-nasa/sthoabackend/vars"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/joho/godotenv"
@@ -32,6 +28,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
+
+func getlessson(c fiber.Ctx) error {
+	c.SendString(c.Params("id"))
+	return nil
+}
 
 func connect(uri string) (*mongo.Client, context.Context,
 	context.CancelFunc, error) {
@@ -110,7 +111,7 @@ func main() {
 
 	// reset "lessons" forder
 	os.RemoveAll("lessons")
-	os.Mkdir("lessons", 0755)
+	os.Mkdir("lesson", 0755)
 
 	// formQuestion := &FormQuestion{
 	// 	truefalse: "truefalse",
@@ -125,8 +126,6 @@ func main() {
 
 	MONGODB_URI := os.Getenv("MONGODB_URI")
 	ADMIN_KEY := os.Getenv("ADMIN_KEY")
-
-	vars.ADMIN_KEY = ADMIN_KEY
 
 	// Use the SetServerAPIOptions() method to set the version of the Stable API on the client
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
@@ -145,10 +144,6 @@ func main() {
 	lesioncoll := client.Database("core_dp").Collection("lessons")
 	questionColl := client.Database("core_dp").Collection("questions")
 	userColl := client.Database("core_dp").Collection("user")
-	forumColl := client.Database("core_dp").Collection("forumColl")
-
-	apiquestion.Setup(questionColl)
-
 	// lesioncoll.Indexes().CreateOne(
 	// 	context.TODO(),
 
@@ -182,31 +177,12 @@ func main() {
 
 	appv1 := app.Route("/v1")
 
-	appv2 := app.Route("/v2")
-
-	// ?key=ADMIN_KEY
-	// body:
-	//   type_question string | typeChosseOne typeTrueFalse typeShortAnswer
-	//   title         string
-	//   options 	   []string
-	//   answer		   string
-	//     type_question is typeChosseOne   | number(0-3) string | ex : "0"
-	//     type_question is typeTrueFalse   | [4]string and only container "t" or "f" | ex : "tftf"
-	//     type_question is typeShortAnswer | string | ex : "this is answer"
-	appv2.Route("/question").Post(apiquestion.CreateQuestion)
-	/**
-	*  ?task=random
-	*  	 ?size int | lesson_id stringHEX | ...
-	 */
-	appv2.Route("/question").Get(apiquestion.GetQuestion)
-
 	appv1.Route("/lesson/:id").
 		Get(func(c fiber.Ctx) error {
 			id, err := strconv.Atoi(c.Params("id"))
 			if err != nil {
 				return c.SendString("error: id must is number")
 			}
-			println(id)
 			var lesson Lesson
 			err = lesioncoll.FindOne(context.TODO(), bson.D{
 				{Key: "lessonid", Value: id}},
@@ -214,7 +190,7 @@ func main() {
 			if err != nil {
 				return c.SendString("error: not found pdf file with id: " + strconv.Itoa(id))
 			}
-			log.Println(lesson.DriveID, lesson.Name)
+			log.Println(lesson.DriveID)
 			data, err := getFileDrive(id, lesson.DriveID)
 			if err != nil {
 				panic(err)
@@ -271,7 +247,7 @@ func main() {
 			},
 		)
 		if err != nil {
-			return nil
+			panic(err)
 		}
 		var questions []Question
 		// cursor.Decode(&questions)
@@ -313,6 +289,8 @@ func main() {
 	appv1.Route("user").Get(func(c fiber.Ctx) error {
 		accessToken := c.Query("access_token")
 		var user User
+		log.Println(accessToken)
+
 		response, errhttp := http.Get("https://www.googleapis.com/oauth2/v3/userinfo?access_token=" + accessToken)
 		if errhttp != nil {
 			panic(errhttp)
@@ -325,23 +303,20 @@ func main() {
 			panic(err)
 		}
 
-		amountUser, errAmountUser := userColl.CountDocuments(
+		cnt, _ := userColl.CountDocuments(
 			context.TODO(),
 			bson.D{
 				{"email", usergg.Email},
 			},
 		)
-		if errAmountUser != nil {
-			panic(errAmountUser)
-		}
 
-		if amountUser == 0 {
+		if cnt == 0 {
 			print("create user")
 			user.PhotoUrl = usergg.Picture
 			user.Name = usergg.Email
 			user.Lever = 0
 			user.Email = usergg.Email
-			user.Token = random.Createtoken16()
+			user.Token = "23478"
 			userColl.InsertOne(
 				context.TODO(),
 				user,
@@ -354,6 +329,7 @@ func main() {
 					{"email", usergg.Email},
 				},
 			).Decode(&user)
+
 		}
 
 		data := map[string]string{
@@ -367,79 +343,6 @@ func main() {
 		c.SendString(string(jsonString))
 		return nil
 	})
-	appv1.Route("user/callback").Get(func(c fiber.Ctx) error {
-		print("brrr")
-		token := c.Query("token")
-		var user User
-		amountUser, errAmountUser := userColl.CountDocuments(
-			context.TODO(),
-			bson.D{
-				{"token", token},
-			},
-		)
-		if errAmountUser != nil {
-			panic(errAmountUser)
-		}
-
-		if amountUser == 0 {
-			return c.SendStatus(400)
-		} else {
-			print("loading data user")
-			err = userColl.FindOne(
-				context.TODO(),
-				bson.D{
-					{"token", token},
-				},
-			).Decode(&user)
-		}
-
-		data := map[string]string{
-			"photoUrl": user.PhotoUrl,
-			"name":     user.Name,
-			"lever":    strconv.Itoa(user.Lever),
-			"email":    user.Email,
-			"token":    user.Token,
-		}
-		jsonString, _ := json.Marshal(data)
-		c.SendString(string(jsonString))
-		return nil
-	})
-
-	appv1.Route("forum/createpost").Post(func(c fiber.Ctx) error {
-		var data map[string]string
-		println(string(c.Body()))
-		json.Unmarshal(c.Body(), &data)
-
-		println(data["a"])
-		var post forum.Post
-		post.Tile = data["title"]
-		post.Body = data["body"]
-
-		token := data["token"]
-		var user User
-		errorGetUser := userColl.FindOne(
-			context.TODO(),
-			bson.D{
-				{"token", token},
-			},
-		).Decode(&user)
-		if errorGetUser == mongo.ErrNoDocuments {
-			return c.SendStatus(400)
-		}
-		if errorGetUser != nil {
-			panic(errorGetUser)
-		}
-		post.UserID = user.ID
-		forumColl.InsertOne(
-			context.TODO(),
-			post,
-		)
-
-		return c.SendStatus(200)
-	})
-	appv1.Route("forum/view").Get(func(c fiber.Ctx) error {
-		//forumColl.
-		return nil
-	})
+	// appv1.Route("question/:id")
 	log.Fatal(app.Listen(":4000"))
 }
